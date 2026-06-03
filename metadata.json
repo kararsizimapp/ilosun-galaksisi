@@ -1,0 +1,6 @@
+{
+  "name": "İloş'un Galaksisi",
+  "description": "İloş Hanım için en ince ayrıntısına kadar düşünülerek, dondurulmuş çilekler ve dualar eşliğinde tasarlanmış özel çalışma, spor, eğlence ve yapay zeka asistan portalı.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
