@@ -1,27 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Sun, Moon, BookOpen, Dumbbell, Gamepad2, Sparkles, MessageSquare, 
-  MapPin, Heart, Shield, RefreshCw, Calendar, Flame, Palette, Film, Star
+  Sparkles, MapPin, Heart, Shield, RefreshCw, Clock, Trophy, Star
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-// Import custom sections
-import KPSSStudy from "./components/KPSSStudy";
-import FitnessNutrition from "./components/FitnessNutrition";
-import ChatAssistant from "./components/ChatAssistant";
-import BurcAstronomy from "./components/BurcAstronomy";
-import EntertainmentRoom from "./components/EntertainmentRoom";
-
-// New custom sections
-import SamsunCalendar from "./components/SamsunCalendar";
-import DietPlanner from "./components/DietPlanner";
-import MiniGames from "./components/MiniGames";
-import MovieCurator from "./components/MovieCurator";
-import LoveVault from "./components/LoveVault";
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"kpss" | "vault" | "gym" | "samsun" | "chill" | "games" | "chat">("kpss");
-  
+  // State for KPSS Countdown
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    percentage: 0
+  });
+
   // Nice words pool to randomly render in the footer on refreshes
   const niceWordsPool = [
     "Sen gökyüzünde parlayan en eşsiz aslan burcu yıldızısın; her günün asalet, zarafet ve sonsuz başarı ile dolsun İloşum! 🌟💅",
@@ -53,7 +45,6 @@ export default function App() {
   const [showNazarSavar, setShowNazarSavar] = useState(false);
   const [showErikTruck, setShowErikTruck] = useState(false);
   const [erikRain, setErikRain] = useState<number[]>([]);
-  const [showFloatingChat, setShowFloatingChat] = useState(false);
   const [showIcardi, setShowIcardi] = useState(false);
   const [icardiRain, setIcardiRain] = useState<number[]>([]);
 
@@ -124,18 +115,46 @@ export default function App() {
     const idx = Math.floor(Math.random() * niceWordsPool.length);
     setFooterQuote(niceWordsPool[idx]);
 
-    // Clock ticker representing Samsun/Istanbul Time (UTC+3)
-    const updateTime = () => {
+    // Clock and Countdown ticker representing Samsun/Istanbul Time (UTC+3)
+    const updateTimeAndCountdown = () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+
+      // Target Date: 2026 KPSS Ön Lisans (Usually September 20, 2026, 10:15)
+      const targetDate = new Date("2026-09-20T10:15:00");
+      // Reference start date (e.g. January 1, 2026, to calculate progress bar)
+      const startDate = new Date("2026-01-01T00:00:00");
+      
+      const totalTime = targetDate.getTime() - startDate.getTime();
+      const currentPassed = now.getTime() - startDate.getTime();
+      const difference = targetDate.getTime() - now.getTime();
+      
+      let days = 0;
+      let hours = 0;
+      let minutes = 0;
+      let seconds = 0;
+      let percentage = 0;
+      
+      if (difference > 0) {
+        days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+        minutes = Math.floor((difference / 1000 / 60) % 60);
+        seconds = Math.floor((difference / 1000) % 60);
+        percentage = Math.min(100, Math.max(0, Math.round((currentPassed / totalTime) * 100)));
+      } else {
+        percentage = 100;
+      }
+      
+      setTimeLeft({ days, hours, minutes, seconds, percentage });
     };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+
+    updateTimeAndCountdown();
+    const interval = setInterval(updateTimeAndCountdown, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Lock body scroll when Nazar Savar is active to prevent any jumping or layout issues
+  // Lock body scroll when Nazar Savar is active
   useEffect(() => {
     if (showNazarSavar) {
       document.body.style.overflow = "hidden";
@@ -201,22 +220,17 @@ export default function App() {
       {/* Nazar Savar Modal */}
       {showNazarSavar && (
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-purple-950/40 backdrop-blur-xs transition-all animate-fade-in">
-          
-          {/* Pulsing neon purple outer shield border */}
           <div className="absolute inset-4 border-4 border-dashed border-purple-500/40 rounded-[3rem] opacity-75 pointer-events-none animate-pulse" />
           <div className="absolute inset-8 border border-purple-400/20 rounded-[2.5rem] opacity-30 pointer-events-none" />
           
           <div className="bg-black/95 border-4 border-purple-500 rounded-[2.5rem] p-8 max-w-sm text-center shadow-[0_0_50px_rgba(168,85,247,0.6)] relative z-10 animate-[bounce_0.6s_ease-out_1]">
             <div className="text-6xl mb-4 animate-[spin_6s_linear_infinite] select-none filter drop-shadow-[0_0_15px_rgba(168,85,247,0.8)]">🧿</div>
-            
             <h4 className="text-md font-black text-purple-400 font-display tracking-tight uppercase">
               🛡️ MUSTAFA CAN ÖZEL KORUMASI AKTİF! 🛡️
             </h4>
-            
             <p className="text-xs text-purple-100 leading-relaxed font-sans mt-3 font-semibold">
               "Kainat ve Galaksi güzeli İloş Hanım ve asil ailesinin sağlığı, kütüphane motivasyonu, fıstıklı dürümleri ve aslan burcu pürüzsüz konsantrasyonu %100 akortlu MOR ZIRH koruması altındadır! Sayfanın köşelerinde mor kalpler bizzat Mustafa Can tarafından oluşturulmuş kalkanlardır."
             </p>
-            
             <button
               onClick={() => setShowNazarSavar(false)}
               className="mt-6 w-full bg-gradient-to-r from-purple-500 to-indigo-650 hover:from-purple-600 hover:to-indigo-750 text-white px-6 py-2.5 rounded-xl text-xs font-black leading-none cursor-pointer tracking-wider uppercase transition-all shadow-[0_0_15px_rgba(168,85,247,0.4)] active:scale-95"
@@ -278,8 +292,6 @@ export default function App() {
       {/* Mauro Icardi Galatasaray Celebration Modal */}
       {showIcardi && (
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-amber-950/40 backdrop-blur-xs transition-all animate-fade-in">
-          
-          {/* Galatasaray colored outer shield borders */}
           <div className="absolute inset-4 border-4 border-dashed border-yellow-500/40 rounded-[3rem] opacity-75 pointer-events-none animate-pulse" />
           <div className="absolute inset-8 border border-red-500/20 rounded-[2.5rem] opacity-30 pointer-events-none" />
           
@@ -373,7 +385,7 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:py-6 space-y-6">
+      <main className="flex-1 max-w-4xl mx-auto w-full p-4 md:py-12 space-y-8">
 
         {/* Live Client-Server Daily Motivation Banner */}
         <div className="bg-white border-b-8 border-r-8 border-vp-borderpink rounded-[2rem] p-6 shadow-xl relative overflow-hidden grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
@@ -387,212 +399,102 @@ export default function App() {
             <p className="text-sm md:text-md text-vp-maroon font-sans font-black leading-relaxed" id="live_motivation_quote">
               "{inspiration.quote}"
             </p>
-            <p className="text-xs text-slate-500 font-sans italic mt-1 font-medium" id="live_motivation_action">
-              👉 {inspiration.action}
-            </p>
           </div>
-
-          <div className="md:col-span-1 flex justify-end">
-            <button
-              onClick={fetchInspiration}
-              className="bg-vp-pink hover:bg-vp-hotpink text-white border-2 border-white rounded-xl px-4 py-2.5 text-xs font-bold font-sans flex items-center gap-2 cursor-pointer transition-colors shadow-md active:scale-95"
-              id="refresh_inspiration_btn"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Günü Güncelle
-            </button>
+          <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-2xl text-center shadow-inner">
+            <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">Aura Akordu</div>
+            <div className="text-xs font-black text-vp-pink mt-1 animate-pulse uppercase font-mono">{inspiration.action}</div>
           </div>
         </div>
 
-        {/* Dynamic Tab Switcher */}
-        <div className="flex border-b border-vp-lightpink p-1 gap-2 overflow-x-auto scroll-smooth custom-scrollbar-thin shrink-0 mb-4">
-          <button
-            onClick={() => setActiveTab("kpss")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "kpss" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_kpss"
-          >
-            <BookOpen className="w-4 h-4 shrink-0" />
-            <span>KPSS Odası</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("vault")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "vault" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_vault"
-          >
-            <Sparkles className="w-4 h-4 text-vp-hotpink shrink-0 animate-pulse" />
-            <span>Musti'den Sürprizler ✨</span>
-          </button>
+        {/* 2026 KPSS Ön Lisans Geri Sayım Sayacı */}
+        <div className="bg-gradient-to-r from-vp-maroon via-slate-900 to-vp-maroon border-b-8 border-r-8 border-amber-500 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
+          {/* Decorative cosmic grids */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem]" />
           
-          <button
-            onClick={() => setActiveTab("gym")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "gym" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_gym"
-          >
-            <Dumbbell className="w-4 h-4 shrink-0" />
-            <span>Spor & Diyet</span>
-          </button>
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-2 text-center md:text-left">
+              <div className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-400/45 px-3 py-1 rounded-full text-[10px] font-mono font-black text-amber-300 uppercase tracking-widest">
+                <Clock className="w-3.5 h-3.5 animate-pulse" />
+                ÖSYM • 2026 KPSS ÖN LİSANS GERİ SAYIMI 🎯
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-amber-400">
+                Hedefe Kilitlendik İloş! 🇹🇷👩‍💼
+              </h2>
+              <p className="text-xs text-slate-300 max-w-md font-medium leading-relaxed">
+                Atakum sahili meltemi eşliğinde, her saniye akortlu çalışarak o şampiyonluk kupasını kaldıracağız! Sınav Tarihi: <span className="text-amber-300 font-bold">20 Eylül 2026 - 10:15</span>
+              </p>
+            </div>
 
-          <button
-            onClick={() => setActiveTab("samsun")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "samsun" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_samsun"
-          >
-            <Calendar className="w-4 h-4 shrink-0" />
-            <span>Samsun Rehberi</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("chill")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "chill" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_chill"
-          >
-            <Film className="w-4 h-4 shrink-0" />
-            <span>Müzik ve Sinema</span>
-          </button>
+            {/* Countdown Clock Grid */}
+            <div className="grid grid-cols-4 gap-2 md:gap-4 w-full md:w-auto shrink-0">
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
+                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
+                  {timeLeft.days}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">GÜN</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
+                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
+                  {timeLeft.hours.toString().padStart(2, "0")}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">SAAT</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
+                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
+                  {timeLeft.minutes.toString().padStart(2, "0")}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">DAKİKA</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
+                <div className="text-2xl md:text-4xl font-black font-mono text-red-400 tracking-tight animate-pulse">
+                  {timeLeft.seconds.toString().padStart(2, "0")}
+                </div>
+                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">SANİYE</div>
+              </div>
+            </div>
+          </div>
 
-          <button
-            onClick={() => setActiveTab("games")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "games" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_games"
-          >
-            <Star className="w-4 h-4 shrink-0 animate-spin-slow" />
-            <span>Mini Oyunlar</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("chat")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "chat" 
-                ? "bg-vp-pink text-white shadow-md border-b-4 border-r-4 border-vp-borderpink" 
-                : "bg-white border border-vp-lightpink shadow-sm text-vp-maroon"
-            }`}
-            id="tab_chat"
-          >
-            <MessageSquare className="w-4 h-4 shrink-0" />
-            <span>Can Yoldaşı & Albüm</span>
-          </button>
+          {/* Progress Bar */}
+          <div className="mt-6 relative z-10">
+            <div className="flex justify-between text-[10px] text-slate-300 font-mono font-bold mb-1.5 uppercase">
+              <span>Yolculuk Başlangıcı (1 Oca 2026)</span>
+              <span className="text-amber-300 font-black">İlerleme: %{timeLeft.percentage}</span>
+              <span>Sınav Günü</span>
+            </div>
+            <div className="w-full bg-white/10 h-3.5 rounded-full p-0.5 border border-white/10 overflow-hidden relative">
+              <div 
+                className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full rounded-full transition-all duration-1000 relative shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                style={{ width: `${timeLeft.percentage}%` }}
+              >
+                {/* Slidable glowing star indicator */}
+                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs filter drop-shadow-[0_0_4px_rgba(255,255,255,1)]">⭐</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Tab Contents loaded conditionally with framer-motion page flow */}
-        <div className="relative min-h-[480px]">
-          <AnimatePresence mode="wait">
-            {activeTab === "kpss" && (
-              <motion.div
-                key="kpss"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <KPSSStudy />
-              </motion.div>
-            )}
-
-            {activeTab === "vault" && (
-              <motion.div
-                key="vault"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <LoveVault />
-              </motion.div>
-            )}
- 
-            {activeTab === "gym" && (
-              <motion.div
-                key="gym"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="space-y-6"
-              >
-                <FitnessNutrition />
-                <DietPlanner />
-              </motion.div>
-            )}
-
-            {activeTab === "samsun" && (
-              <motion.div
-                key="samsun"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <SamsunCalendar />
-              </motion.div>
-            )}
- 
-            {activeTab === "chat" && (
-              <motion.div
-                key="chat"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="space-y-6"
-              >
-                {/* Can Yoldaşı has been highly expanded and developed internally */}
-                <ChatAssistant />
-                
-                {/* Kozmik Yıldız Yorumcusu is horizontally stretched to full-width underneath */}
-                <BurcAstronomy />
-              </motion.div>
-            )}
- 
-            {activeTab === "chill" && (
-              <motion.div
-                key="chill"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="space-y-6"
-              >
-                <EntertainmentRoom />
-                <MovieCurator />
-              </motion.div>
-            )}
-
-            {activeTab === "games" && (
-              <motion.div
-                key="games"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-              >
-                <MiniGames />
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Motivational Board */}
+        <div className="bg-white border-b-4 border-r-4 border-vp-lightpink/60 border-2 p-6 rounded-[2rem] shadow-sm space-y-4">
+          <h3 className="text-xs font-mono font-black text-vp-pink uppercase tracking-widest flex items-center gap-1.5">
+            <span>📚 AKORTLU BAŞARI VE MOTİVASYON MERKEZİ</span>
+          </h3>
+          <p className="text-xs text-slate-600 font-sans leading-relaxed font-medium">
+            Önümüzdeki süreci en akortlu, pürüzsüz ve disiplinli şekilde yöneteceğiz İloş! Bu sayfa senin motivasyon merkezindir. Aşağıdan günün sözlerini değiştirebilir ve her saniye KPSS hedefine kilitlenebilirsin.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100/50">
+              <div className="text-[10px] font-mono font-black text-vp-pink uppercase tracking-wider mb-1">🎯 Günlük Hedef Stratejisi</div>
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                Samsun kütüphane masasında her gün düzenli soru çözümü ve paragrafları darmadağın etme disiplini!
+              </p>
+            </div>
+            <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100/50">
+              <div className="text-[10px] font-mono font-black text-rose-600 uppercase tracking-wider mb-1">🦁 Aslan Burcu Aurası</div>
+              <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                Sarsılmaz irade, özgüven ve Atakum melteminin ferahlığıyla tüm hedeflerine teker teker ulaşacaksın!
+              </p>
+            </div>
+          </div>
         </div>
 
       </main>
@@ -606,8 +508,8 @@ export default function App() {
           
           {/* Beautiful Quote Display Container */}
           <div className="bg-vp-bg border border-vp-borderpink p-5 rounded-3xl max-w-xl shadow-xs relative">
-            <span className="text-3s font-mono text-vp-pink uppercase tracking-widest block mb-2 font-black">✨ GÜNÜN İLHAM VEREN GÜZEL SÖZÜ ✨</span>
-            <p className="text-sm text-vp-maroon italic font-sans font-black leading-relaxed">
+            <span className="text-[10px] font-mono text-vp-pink uppercase tracking-widest block mb-2 font-black">✨ GÜNÜN İLHAM VEREN GÜZEL SÖZÜ ✨</span>
+            <p className="text-xs text-vp-maroon italic font-sans font-black leading-relaxed">
               "{footerQuote || "Sen gökyüzünde parlayan en eşsiz aslan burcu yıldızısın; her günün asalet ve sonsuz başarı ile dolsun İloşum!"}"
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
