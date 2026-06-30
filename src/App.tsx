@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Sparkles, MapPin, Heart, Shield, RefreshCw, Clock, Trophy, Star,
-  Plus, Minus, Check, Trash2, Coffee, BookOpen, PenTool
+  Plus, Minus, Check, Trash2, Coffee, BookOpen, PenTool,
+  Play, Pause, Volume2, Music, Wind
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -49,6 +50,7 @@ export default function App() {
   const [erikRain, setErikRain] = useState<number[]>([]);
   const [showIcardi, setShowIcardi] = useState(false);
   const [icardiRain, setIcardiRain] = useState<number[]>([]);
+  const [showCrsSporModal, setShowCrsSporModal] = useState(false);
 
   // Utopian & Cosmic Feature States
   const [stressInput, setStressInput] = useState("");
@@ -65,6 +67,34 @@ export default function App() {
   const [crystalMessage, setCrystalMessage] = useState("Kristal uykuda. Dokunarak akort et canım İloş! ✨");
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
   const [telepathicReply, setTelepathicReply] = useState("");
+
+  // Atakum Kütüphane Akustiği States
+  const [ambientPlaying, setAmbientPlaying] = useState(false);
+  const [ambientTrack, setAmbientTrack] = useState<"poyraz" | "focus" | "night">("poyraz");
+  const [ambientVolumes, setAmbientVolumes] = useState({
+    master: 0.6,
+    synth: 0.5,
+    beat: 0.4,
+    rain: 0.3,
+    keyboard: 0.15
+  });
+
+  // Audio refs to manipulate the synth & volumes dynamically without restarts
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const synthGainRef = useRef<GainNode | null>(null);
+  const beatGainRef = useRef<GainNode | null>(null);
+  const rainGainRef = useRef<GainNode | null>(null);
+  const keyboardGainRef = useRef<GainNode | null>(null);
+  const rainSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  
+  // Schedule timers
+  const timersRef = useRef<{
+    chordIntervalId?: any;
+    beatIntervalId?: any;
+    keyboardTimeoutId?: any;
+  }>({});
+  const beatStepRef = useRef<number>(0);
 
   // Sound effects helper for cosmic actions
   const playCosmicSound = (type: "bubble" | "crystal" | "pop") => {
@@ -244,6 +274,358 @@ export default function App() {
       setIcardiRain([]);
     }, 4500);
   };
+
+  const stopAmbientAudio = () => {
+    // Clear intervals
+    if (timersRef.current.chordIntervalId) {
+      clearInterval(timersRef.current.chordIntervalId);
+      timersRef.current.chordIntervalId = undefined;
+    }
+    if (timersRef.current.beatIntervalId) {
+      clearInterval(timersRef.current.beatIntervalId);
+      timersRef.current.beatIntervalId = undefined;
+    }
+    if (timersRef.current.keyboardTimeoutId) {
+      clearTimeout(timersRef.current.keyboardTimeoutId);
+      timersRef.current.keyboardTimeoutId = undefined;
+    }
+
+    // Stop rain source
+    if (rainSourceRef.current) {
+      try {
+        rainSourceRef.current.stop();
+      } catch (e) {}
+      rainSourceRef.current = null;
+    }
+
+    // Set state
+    setAmbientPlaying(false);
+  };
+
+  const startAmbientAudio = (trackToPlay = ambientTrack) => {
+    // First, stop any existing audio
+    stopAmbientAudio();
+
+    try {
+      // 1. Create or resume AudioContext
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      
+      let ctx = audioCtxRef.current;
+      if (!ctx || ctx.state === "closed") {
+        ctx = new AudioContextClass();
+        audioCtxRef.current = ctx;
+      }
+      
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      const now = ctx.currentTime;
+
+      // 2. Setup Gains
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+      masterGainRef.current = masterGain;
+
+      const synthGain = ctx.createGain();
+      synthGain.connect(masterGain);
+      synthGainRef.current = synthGain;
+
+      const beatGain = ctx.createGain();
+      beatGain.connect(masterGain);
+      beatGainRef.current = beatGain;
+
+      const rainGain = ctx.createGain();
+      rainGain.connect(masterGain);
+      rainGainRef.current = rainGain;
+
+      const keyboardGain = ctx.createGain();
+      keyboardGain.connect(masterGain);
+      keyboardGainRef.current = keyboardGain;
+
+      // Apply initial volumes
+      masterGain.gain.setValueAtTime(ambientVolumes.master, now);
+      synthGain.gain.setValueAtTime(ambientVolumes.synth, now);
+      beatGain.gain.setValueAtTime(ambientVolumes.beat * 0.8, now);
+      rainGain.gain.setValueAtTime(ambientVolumes.rain * 0.15, now);
+      keyboardGain.gain.setValueAtTime(ambientVolumes.keyboard * 0.4, now);
+
+      // 3. Setup Yağmur (Rain White Noise Loop)
+      const bufferSize = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      const rainSource = ctx.createBufferSource();
+      rainSource.buffer = buffer;
+      rainSource.loop = true;
+
+      const rainFilter = ctx.createBiquadFilter();
+      rainFilter.type = "lowpass";
+      rainFilter.frequency.setValueAtTime(500, now);
+
+      rainSource.connect(rainFilter);
+      rainFilter.connect(rainGain);
+      rainSource.start(now);
+      rainSourceRef.current = rainSource;
+
+      // 4. Setup Chords & Melody Loops
+      const getChordNotes = (track: "poyraz" | "focus" | "night", index: number) => {
+        const tracks = {
+          poyraz: [
+            [174.61, 220.00, 261.63, 329.63], // Fmaj7
+            [196.00, 246.94, 293.66, 329.63], // G6
+            [164.81, 196.00, 246.94, 293.66], // Em7
+            [220.00, 261.63, 329.63, 392.00]  // Am7
+          ],
+          focus: [
+            [130.81, 164.81, 196.00, 246.94], // Cmaj7
+            [110.00, 164.81, 220.00, 261.63, 329.63], // Am9
+            [146.83, 174.61, 220.00, 261.63], // Dm7
+            [146.83, 196.00, 246.94, 349.23]  // G7
+          ],
+          night: [
+            [146.83, 185.00, 220.00, 277.18], // Dmaj7
+            [123.47, 146.83, 185.00, 220.00], // Bm7
+            [98.00, 123.47, 146.83, 185.00],  // Gmaj7
+            [110.00, 138.59, 164.81, 196.00]  // A7
+          ]
+        };
+        const list = tracks[track];
+        return list[index % list.length];
+      };
+
+      let chordIndex = 0;
+      const playNextChord = () => {
+        const notes = getChordNotes(trackToPlay, chordIndex);
+        chordIndex++;
+        
+        // Play the synthesized chord
+        const cNow = ctx.currentTime;
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, cNow);
+          // Add slight vintage detune (lofi wobble)
+          osc.detune.setValueAtTime((Math.random() - 0.5) * 8, cNow);
+          
+          const filter = ctx.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.setValueAtTime(600 + idx * 50, cNow);
+          
+          osc.connect(filter);
+          filter.connect(oscGain);
+          oscGain.connect(synthGain);
+          
+          oscGain.gain.setValueAtTime(0, cNow);
+          oscGain.gain.linearRampToValueAtTime(0.12, cNow + 1.2);
+          oscGain.gain.setValueAtTime(0.12, cNow + 2.5);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, cNow + 3.9);
+          
+          osc.start(cNow);
+          osc.stop(cNow + 4.0);
+        });
+
+        // Soft random melody bell notes inside the pentatonic scale of the chord
+        if (Math.random() > 0.25) {
+          const melodyNotes = notes.map(n => n * 2); // octave up
+          const randomFreq = melodyNotes[Math.floor(Math.random() * melodyNotes.length)];
+          const delayTime = 1.2 + Math.random() * 1.5;
+
+          const mOsc = ctx.createOscillator();
+          const mGain = ctx.createGain();
+          mOsc.type = "sine";
+          mOsc.frequency.setValueAtTime(randomFreq, cNow + delayTime);
+
+          const mFilter = ctx.createBiquadFilter();
+          mFilter.type = "lowpass";
+          mFilter.frequency.setValueAtTime(800, cNow + delayTime);
+
+          mOsc.connect(mFilter);
+          mFilter.connect(mGain);
+          mGain.connect(synthGain);
+
+          mGain.gain.setValueAtTime(0, cNow);
+          mGain.gain.setValueAtTime(0, cNow + delayTime);
+          mGain.gain.linearRampToValueAtTime(0.06, cNow + delayTime + 0.1);
+          mGain.gain.exponentialRampToValueAtTime(0.001, cNow + delayTime + 1.2);
+
+          mOsc.start(cNow);
+          mOsc.stop(cNow + delayTime + 1.3);
+        }
+      };
+
+      // Play first chord immediately
+      playNextChord();
+      timersRef.current.chordIntervalId = setInterval(playNextChord, 4000);
+
+      // 5. Setup Drum Beat Step (runs every 225ms, approx 133BPM eighth note)
+      beatStepRef.current = 0;
+      const playBeatStep = () => {
+        const step = beatStepRef.current;
+        beatStepRef.current = (step + 1) % 16;
+        
+        const bNow = ctx.currentTime;
+
+        // Kick drum on 0, 8, and double kick on 10
+        if (step === 0 || step === 8 || step === 11) {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(110, bNow);
+          osc.frequency.exponentialRampToValueAtTime(45, bNow + 0.1);
+          
+          oscGain.gain.setValueAtTime(0.25, bNow);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.15);
+          
+          osc.connect(oscGain);
+          oscGain.connect(beatGain);
+          osc.start(bNow);
+          osc.stop(bNow + 0.16);
+        }
+
+        // Soft brush snare on step 4 and 12
+        if (step === 4 || step === 12) {
+          const sBufSize = ctx.sampleRate * 0.18;
+          const sBuf = ctx.createBuffer(1, sBufSize, ctx.sampleRate);
+          const sData = sBuf.getChannelData(0);
+          for (let i = 0; i < sBufSize; i++) {
+            sData[i] = Math.random() * 2 - 1;
+          }
+          const sSource = ctx.createBufferSource();
+          sSource.buffer = sBuf;
+
+          const sFilter = ctx.createBiquadFilter();
+          sFilter.type = "bandpass";
+          sFilter.frequency.setValueAtTime(900, bNow);
+
+          const sGain = ctx.createGain();
+          sGain.gain.setValueAtTime(0.12, bNow);
+          sGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.16);
+
+          sSource.connect(sFilter);
+          sFilter.connect(sGain);
+          sGain.connect(beatGain);
+          sSource.start(bNow);
+          sSource.stop(bNow + 0.18);
+        }
+
+        // Soft shaker/hihat on even steps (0, 2, 4, 6...) with velocity swing
+        if (step % 2 === 0) {
+          const osc = ctx.createOscillator();
+          const oscGain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(7500 + Math.random() * 800, bNow);
+
+          const isHeavy = step % 4 === 0;
+          const targetGain = isHeavy ? 0.025 : 0.012;
+
+          oscGain.gain.setValueAtTime(targetGain + Math.random() * 0.005, bNow);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, bNow + 0.03);
+
+          osc.connect(oscGain);
+          oscGain.connect(beatGain);
+          osc.start(bNow);
+          osc.stop(bNow + 0.04);
+        }
+      };
+
+      timersRef.current.beatIntervalId = setInterval(playBeatStep, 225);
+
+      // 6. Setup Keyboard clicks (recursive random typewriter sounds)
+      const playKeyboardClick = () => {
+        if (!audioCtxRef.current || audioCtxRef.current.state === "closed") return;
+        
+        const kNow = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const kGain = ctx.createGain();
+        
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(1100 + Math.random() * 500, kNow);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(1400, kNow);
+
+        kGain.gain.setValueAtTime(0.04 + Math.random() * 0.03, kNow);
+        kGain.gain.exponentialRampToValueAtTime(0.001, kNow + 0.03);
+
+        osc.connect(filter);
+        filter.connect(kGain);
+        kGain.connect(keyboardGain);
+        osc.start(kNow);
+        osc.stop(kNow + 0.04);
+
+        // Schedule next click randomly (between 150ms and 900ms)
+        const nextDelay = 150 + Math.random() * 750;
+        timersRef.current.keyboardTimeoutId = setTimeout(playKeyboardClick, nextDelay);
+      };
+
+      // Start the recursive click generator
+      timersRef.current.keyboardTimeoutId = setTimeout(playKeyboardClick, 400);
+
+      setAmbientPlaying(true);
+    } catch (e) {
+      console.warn("Could not start lofi engine", e);
+    }
+  };
+
+  // Sync volume adjustments in real-time
+  useEffect(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state === "closed") return;
+    const now = ctx.currentTime;
+
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.setValueAtTime(ambientVolumes.master, now);
+    }
+    if (synthGainRef.current) {
+      synthGainRef.current.gain.setValueAtTime(ambientVolumes.synth, now);
+    }
+    if (beatGainRef.current) {
+      beatGainRef.current.gain.setValueAtTime(ambientVolumes.beat * 0.8, now);
+    }
+    if (rainGainRef.current) {
+      rainGainRef.current.gain.setValueAtTime(ambientVolumes.rain * 0.15, now);
+    }
+    if (keyboardGainRef.current) {
+      keyboardGainRef.current.gain.setValueAtTime(ambientVolumes.keyboard * 0.4, now);
+    }
+  }, [ambientVolumes]);
+
+  // Handle track changing on the fly
+  const handleTrackChange = (track: "poyraz" | "focus" | "night") => {
+    setAmbientTrack(track);
+    if (ambientPlaying) {
+      // Restart loop with new track chords
+      startAmbientAudio(track);
+    }
+  };
+
+  // Safe global cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear timers
+      if (timersRef.current.chordIntervalId) clearInterval(timersRef.current.chordIntervalId);
+      if (timersRef.current.beatIntervalId) clearInterval(timersRef.current.beatIntervalId);
+      if (timersRef.current.keyboardTimeoutId) clearTimeout(timersRef.current.keyboardTimeoutId);
+      
+      // Stop rain buffer
+      if (rainSourceRef.current) {
+        try { rainSourceRef.current.stop(); } catch (e) {}
+      }
+      
+      // Close AudioContext
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch (e) {}
+      }
+    };
+  }, []);
 
   // Fetch inspiration on load
   const fetchInspiration = async () => {
@@ -477,6 +859,40 @@ export default function App() {
         </div>
       )}
 
+      {/* CRS Spor B Planı Makam Koltuğu Modal */}
+      {showCrsSporModal && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-purple-950/40 backdrop-blur-xs transition-all animate-fade-in">
+          <div className="absolute inset-4 border-4 border-dashed border-purple-500/40 rounded-[3rem] opacity-75 pointer-events-none animate-pulse" />
+          <div className="absolute inset-8 border border-purple-400/20 rounded-[2.5rem] opacity-30 pointer-events-none" />
+          
+          <div className="bg-slate-900 border-4 border-purple-500 rounded-[2.5rem] p-8 max-w-sm text-center shadow-[0_0_50px_rgba(168,85,247,0.6)] relative z-10 animate-[bounce_0.6s_ease-out_1]">
+            <div className="text-6xl mb-4 select-none filter drop-shadow-[0_0_15px_rgba(168,85,247,0.8)] animate-bounce text-center justify-center flex gap-1">
+              <span>💼</span><span>🪑</span><span>☕</span><span>💅</span>
+            </div>
+            
+            <h4 className="text-md font-black text-purple-400 font-display tracking-tight uppercase">
+              🛡️ CRS SPOR MAKAM MASASI GARANTİSİ 🛡️
+            </h4>
+            
+            <p className="text-xs text-slate-100 leading-relaxed font-sans mt-3 font-semibold">
+              "Kafanı yormak, strese girmek kesinlikle YASAK İloşum! Sınavı her türlü kazanacağız ama en kötü senaryoda bile dünyanın sonu değil! <br/><br/>
+              CRS Spor'daki o efsanevi, klimalı, sınırsız filtre kahveli ve mor neon ışıklı şampiyon makam masan bizzat Mustafa Can tarafından rezerve edildi ve her an hazır durumda bekliyor.<br/><br/>
+              O koltuk pürüzsüzce arkaya yatıyor, klavyeler yumuşacık pıt pıt ses çıkarıyor! Yani anlayacağın her iki türlü de o şampiyonluk kupası bizim kucağımızda canım İloş! Rahat kafa, bol paragraf!"
+            </p>
+            
+            <button
+              onClick={() => {
+                setShowCrsSporModal(false);
+                playCosmicSound("pop");
+              }}
+              className="mt-6 w-full bg-gradient-to-r from-purple-500 to-indigo-650 hover:from-purple-600 hover:to-indigo-750 text-white px-6 py-2.5 rounded-xl text-xs font-black leading-none cursor-pointer tracking-wider uppercase transition-all shadow-[0_0_15px_rgba(168,85,247,0.4)] active:scale-95"
+            >
+              Tamamdır, Kafam Çok Rahat! 😎💜
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Navigation & Header */}
       <header className="bg-white/80 border-b border-vp-lightpink backdrop-blur-md sticky top-0 z-40 px-4 py-3 shrink-0 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
@@ -557,69 +973,84 @@ export default function App() {
           </div>
         </div>
 
-        {/* 2026 KPSS Ön Lisans Geri Sayım Sayacı */}
-        <div className="bg-gradient-to-r from-vp-maroon via-slate-900 to-vp-maroon border-b-8 border-r-8 border-amber-500 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
+        {/* 2026 KPSS Ön Lisans Geri Sayım Sayacı yerine Çifte Güvence Güvenlik Çemberi */}
+        <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border-b-8 border-r-8 border-purple-500 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
           {/* Decorative cosmic grids */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] opacity-40" />
           
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-2 text-center md:text-left">
-              <div className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-400/45 px-3 py-1 rounded-full text-[10px] font-mono font-black text-amber-300 uppercase tracking-widest">
-                <Clock className="w-3.5 h-3.5 animate-pulse" />
-                ÖSYM • 2026 KPSS ÖN LİSANS GERİ SAYIMI 🎯
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="space-y-3 text-center lg:text-left max-w-2xl">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 px-3.5 py-1.5 rounded-full text-[10px] font-mono font-black text-purple-300 uppercase tracking-widest">
+                <Shield className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+                SADECE HUZUR VE ŞAMPİYONLUK VAR: ÇİFT YÖNLÜ GÜVENCE AKTİF! 🛡️✨
               </div>
-              <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-amber-400">
-                Hedefe Kilitlendik İloş! 👩‍💼🦁
+              <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-amber-300 leading-tight">
+                Sıfır Stres, Çifte Güvence Zırhı İloş! 👩‍💼🦁
               </h2>
-              <p className="text-xs text-slate-300 max-w-md font-medium leading-relaxed">
-                Atakum sahili meltemi eşliğinde, her saniye akortlu çalışarak o şampiyonluk kupasını kaldıracağız! Sınav Tarihi: <span className="text-amber-300 font-bold">4 Ekim 2026 - 10:15</span>
+              <p className="text-xs text-slate-200 leading-relaxed font-semibold">
+                Sınav stresi falan tamamen yasaklandı! Çünkü her iki ihtimalde de kazanan canım İloş olacak. Rahat kafa her zaman en yüksek puanı getirir, o yüzden geriye yaslan, Atakum sahil meltemini hisset ve bu pürüzsüz garanti çemberinin tadını çıkar! 💜✨
               </p>
+              
+              <div className="pt-2 flex flex-wrap gap-3 justify-center lg:justify-start">
+                <button
+                  onClick={() => {
+                    setShowCrsSporModal(true);
+                    playCosmicSound("pop");
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-mono font-black text-[10px] uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-purple-500/35 hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                >
+                  <span>🪑 CRS Spor Makam Koltuğunu Test Et!</span>
+                </button>
+              </div>
             </div>
 
-            {/* Countdown Clock Grid */}
-            <div className="grid grid-cols-4 gap-2 md:gap-4 w-full md:w-auto shrink-0">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
-                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
-                  {timeLeft.days}
+            {/* Cozy Plans Grid */}
+            <div className="w-full lg:w-auto shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+              {/* PLAN A */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center sm:text-left relative overflow-hidden backdrop-blur-md">
+                <div className="absolute top-0 right-0 w-8 h-8 bg-amber-500/10 rounded-bl-2xl flex items-center justify-center">
+                  <span className="text-xs">🏆</span>
                 </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">GÜN</div>
+                <h4 className="text-xs font-black text-amber-400 font-mono tracking-wider uppercase">
+                  ⭐ PLAN A: MEMURİYET
+                </h4>
+                <p className="text-[10px] text-slate-300 mt-2 font-medium leading-relaxed">
+                  Sınavı fethettiğimizde, Atakum sahil kütüphanesinde kahvemizi yudumlayarak devletteki o şanlı koltuğumuza kuruluyoruz! 👩‍💼🌊
+                </p>
+                <div className="mt-3 text-[9px] font-mono font-black text-amber-300/80 bg-amber-500/10 py-1 px-2 rounded inline-block">
+                  %100 HEDEFE KİLİTLENDİK
+                </div>
               </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
-                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
-                  {timeLeft.hours.toString().padStart(2, "0")}
+
+              {/* PLAN B */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center sm:text-left relative overflow-hidden backdrop-blur-md">
+                <div className="absolute top-0 right-0 w-8 h-8 bg-purple-500/10 rounded-bl-2xl flex items-center justify-center">
+                  <span className="text-xs">💼</span>
                 </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">SAAT</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
-                <div className="text-2xl md:text-4xl font-black font-mono text-amber-300 tracking-tight">
-                  {timeLeft.minutes.toString().padStart(2, "0")}
+                <h4 className="text-xs font-black text-purple-400 font-mono tracking-wider uppercase">
+                  🔥 PLAN B: CRS SPOR
+                </h4>
+                <p className="text-[10px] text-slate-300 mt-2 font-medium leading-relaxed">
+                  En ufak bir aksilikte bile dünyanın sonu değil! Mor ledli, klimalı ve sınırsız filtre kahveli makam koltuğun bizzat hazır! ☕🪑
+                </p>
+                <div className="mt-3 text-[9px] font-mono font-black text-purple-300/80 bg-purple-500/10 py-1 px-2 rounded inline-block animate-pulse">
+                  %100 REZERVE VE HAZIR
                 </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">DAKİKA</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 min-w-[70px] md:min-w-[85px] text-center shadow-lg">
-                <div className="text-2xl md:text-4xl font-black font-mono text-red-400 tracking-tight animate-pulse">
-                  {timeLeft.seconds.toString().padStart(2, "0")}
-                </div>
-                <div className="text-[9px] md:text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-1">SANİYE</div>
               </div>
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="mt-6 relative z-10">
-            <div className="flex justify-between text-[10px] text-slate-300 font-mono font-bold mb-1.5 uppercase">
-              <span>Bugün: {todayStr}</span>
-              <span className="text-amber-300 font-black">Sınav İlerlemesi: %{timeLeft.percentage}</span>
-              <span>Sınav Günü: 4 Ekim 2026</span>
-            </div>
-            <div className="w-full bg-white/10 h-3.5 rounded-full p-0.5 border border-white/10 overflow-hidden relative">
-              <div 
-                className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full rounded-full transition-all duration-1000 relative shadow-[0_0_10px_rgba(245,158,11,0.5)]"
-                style={{ width: `${timeLeft.percentage}%` }}
-              >
-                {/* Slidable glowing star indicator */}
-                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs filter drop-shadow-[0_0_4px_rgba(255,255,255,1)]">⭐</span>
+          {/* Guarantee Badges */}
+          <div className="mt-6 relative z-10 border-t border-white/10 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🤝</span>
+              <div>
+                <div className="text-[10px] font-mono font-black text-purple-300 uppercase">MUSTAFA CAN KEFALETİ</div>
+                <div className="text-[9px] text-slate-400 font-medium">Bu yolda asla yalnız değilsin, her saniye seninle akortluyuz.</div>
               </div>
+            </div>
+            <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 px-3 py-1.5 rounded-xl border border-purple-500/30 text-[9px] font-mono font-black text-purple-300 tracking-wider uppercase flex items-center gap-1.5">
+              <span>🧿 NAZAR SAVAR KALKANI DEVREDE</span>
             </div>
           </div>
         </div>
