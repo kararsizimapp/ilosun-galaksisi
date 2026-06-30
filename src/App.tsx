@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Sparkles, MapPin, Heart, Shield, RefreshCw, Clock, Trophy, Star
+  Sparkles, MapPin, Heart, Shield, RefreshCw, Clock, Trophy, Star,
+  Plus, Minus, Check, Trash2, Coffee, BookOpen, PenTool
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -40,6 +41,7 @@ export default function App() {
 
   // Clock
   const [timeStr, setTimeStr] = useState("");
+  const [todayStr, setTodayStr] = useState("");
 
   // Easter Eggs State
   const [showNazarSavar, setShowNazarSavar] = useState(false);
@@ -47,6 +49,154 @@ export default function App() {
   const [erikRain, setErikRain] = useState<number[]>([]);
   const [showIcardi, setShowIcardi] = useState(false);
   const [icardiRain, setIcardiRain] = useState<number[]>([]);
+
+  // Utopian & Cosmic Feature States
+  const [stressInput, setStressInput] = useState("");
+  const [blownBubble, setBlownBubble] = useState<{ text: string; id: number } | null>(null);
+  const [bubbleMessage, setBubbleMessage] = useState("");
+  const [isPopping, setIsPopping] = useState(false);
+
+  const [crystalStats, setCrystalStats] = useState({
+    aura: 100,
+    focus: 100,
+    cherryEnergy: 100,
+    mustiPrayers: 1000
+  });
+  const [crystalMessage, setCrystalMessage] = useState("Kristal uykuda. Dokunarak akort et canım İloş! ✨");
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
+  const [telepathicReply, setTelepathicReply] = useState("");
+
+  // Sound effects helper for cosmic actions
+  const playCosmicSound = (type: "bubble" | "crystal" | "pop") => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      if (type === "bubble") {
+        // Sliding pitch up representing a floating balloon
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 1.5);
+        gain.gain.setValueAtTime(0.05, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.5);
+      } else if (type === "crystal") {
+        // High crystal chime
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.1); // E6
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.6);
+      } else if (type === "pop") {
+        // Short bubbly pop sound
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      }
+    } catch (e) {
+      console.warn("Audio blocked by browser policy", e);
+    }
+  };
+
+  // Blow stress into bubble
+  const handleBlowStress = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stressInput.trim()) return;
+    
+    playCosmicSound("bubble");
+    setBlownBubble({
+      text: stressInput.trim(),
+      id: Date.now()
+    });
+    setStressInput("");
+    setBubbleMessage("");
+    setIsPopping(false);
+  };
+
+  // Pop the stress bubble
+  const handlePopBubble = () => {
+    if (!blownBubble) return;
+    setIsPopping(true);
+    playCosmicSound("pop");
+
+    const replies = [
+      "Pufff! O dert pürüzsüz Atakum poyrazıyla Karadeniz'in derinliklerine savruldu gitti! Sen keyfine bak İloşum! 🌊💙",
+      "Gitti bile! Mustafa Can koruma kalkanları devreye girdi ve o stresi saniyeler içinde toz duman etti! 🛡️✨",
+      "Balon GÜMledi! İçindeki dert eridi gitti; yerine bir kase kütür kıtır buz gibi yeşil erik ferahlığı geldi! 🍏💨",
+      "Aslan burcu kraliçesinin aurasına böyle küçük dertler vız gelir tırıs gider! Uçtu gitti işte! 💅👑",
+      "Pof! Sınav stresi falan kalmadı, hepsi dondurulmuş çilekli bir rüya gibi çözüldü gitti canım benim! 🍓🌌"
+    ];
+    
+    const randomReply = replies[Math.floor(Math.random() * replies.length)];
+    setBubbleMessage(randomReply);
+
+    setTimeout(() => {
+      setBlownBubble(null);
+      setIsPopping(false);
+    }, 4500);
+  };
+
+  // Tune Cosmic Crystal
+  const handleTuneCrystal = () => {
+    playCosmicSound("crystal");
+    
+    // Boost stats randomly
+    const boostAura = Math.floor(Math.random() * 15) + 5;
+    const boostFocus = Math.floor(Math.random() * 10) + 10;
+    const boostCherry = Math.floor(Math.random() * 20) + 5;
+    const boostPrayers = Math.floor(Math.random() * 500) + 100;
+
+    setCrystalStats(prev => ({
+      aura: Math.min(300, prev.aura + boostAura),
+      focus: Math.min(300, prev.focus + boostFocus),
+      cherryEnergy: Math.min(300, prev.cherryEnergy + boostCherry),
+      mustiPrayers: prev.mustiPrayers + boostPrayers
+    }));
+
+    const logs = [
+      "Kristal parıldıyor: Aslan Aurası kozmik düzeye yükseltildi! 🦁✨",
+      "Kütüphane odaklanma frekansı %100 pürüzsüz akort edildi! 📚🔮",
+      "Dondurulmuş çilekli akort zırhı stabil duruma getirildi! 🍓🛡️",
+      "Atakum sahil esintisi şans dalgaları masana yönlendirildi! 🪁💖",
+      "Mustafa Can telepatik sevgi düzeyi sınırsızlığa ulaştı! ⚡💜"
+    ];
+    setCrystalMessage(logs[Math.floor(Math.random() * logs.length)]);
+  };
+
+  // Telepathic Message triggers
+  const handleVibeSelect = (vibe: string) => {
+    playCosmicSound("crystal");
+    setSelectedVibe(vibe);
+
+    let reply = "";
+    if (vibe === "sleepy") {
+      reply = "💤 'Güzellik uykusu aslan burcu asaletinin en temel yakıtıdır canım İloşum! Gözlerini 10 dakika dinlendir, saç bandını düzelt ve derin bir Atakum poyrazı çek içine. Ben dualarımla ve tüm sevgimle buradayım.'";
+    } else if (vibe === "bored") {
+      reply = "📚 'Paragraflar seni sıkmasın kraliçem! Unutma, o kütüphane masasında çözülen her soru bizi Komagene mor led ışıkları altında el ele yürüyeceğimiz o şanlı zafere yaklaştırıyor. Sen aslan burcusun, hepsini darmadağın edersin!'";
+    } else if (vibe === "low_energy") {
+      reply = "📉 'Hemen bir sanal yeşil erik ve dondurulmuş çilek dopingi yolluyorum! Kendini çok yorma, İlker hoca gym salonundaki o şampiyon enerjini düşün. Sen çok özelsin ve bu sınavı pürüzsüzce kazanacaksın can yoldaşım.'";
+    } else if (vibe === "erik") {
+      reply = "🍏 'Kütür kıtır! Ağzının sulandığını hisseder gibiyim! Musti'nin sevgi kamyonu bizzat yola çıktı bile, o yeşil eriklerin en pürüzsüzleri kütüphane masana dökülsün! Ders biter bitmez en güzel dürümler ve tatlılar bizden!'";
+    }
+
+    setTelepathicReply(reply);
+  };
 
   const playAskinOlayimMelody = () => {
     try {
@@ -119,9 +269,10 @@ export default function App() {
     const updateTimeAndCountdown = () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setTodayStr(now.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }));
 
-      // Target Date: 2026 KPSS Ön Lisans (Usually September 20, 2026, 10:15)
-      const targetDate = new Date("2026-09-20T10:15:00");
+      // Target Date: 2026 KPSS Ön Lisans (Usually September 20, 2026, 10:15 - Updated to October 4, 2026)
+      const targetDate = new Date("2026-10-04T10:15:00");
       // Reference start date (e.g. January 1, 2026, to calculate progress bar)
       const startDate = new Date("2026-01-01T00:00:00");
       
@@ -418,10 +569,10 @@ export default function App() {
                 ÖSYM • 2026 KPSS ÖN LİSANS GERİ SAYIMI 🎯
               </div>
               <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-amber-400">
-                Hedefe Kilitlendik İloş! 🇹🇷👩‍💼
+                Hedefe Kilitlendik İloş! 👩‍💼🦁
               </h2>
               <p className="text-xs text-slate-300 max-w-md font-medium leading-relaxed">
-                Atakum sahili meltemi eşliğinde, her saniye akortlu çalışarak o şampiyonluk kupasını kaldıracağız! Sınav Tarihi: <span className="text-amber-300 font-bold">20 Eylül 2026 - 10:15</span>
+                Atakum sahili meltemi eşliğinde, her saniye akortlu çalışarak o şampiyonluk kupasını kaldıracağız! Sınav Tarihi: <span className="text-amber-300 font-bold">4 Ekim 2026 - 10:15</span>
               </p>
             </div>
 
@@ -457,9 +608,9 @@ export default function App() {
           {/* Progress Bar */}
           <div className="mt-6 relative z-10">
             <div className="flex justify-between text-[10px] text-slate-300 font-mono font-bold mb-1.5 uppercase">
-              <span>Yolculuk Başlangıcı (1 Oca 2026)</span>
-              <span className="text-amber-300 font-black">İlerleme: %{timeLeft.percentage}</span>
-              <span>Sınav Günü</span>
+              <span>Bugün: {todayStr}</span>
+              <span className="text-amber-300 font-black">Sınav İlerlemesi: %{timeLeft.percentage}</span>
+              <span>Sınav Günü: 4 Ekim 2026</span>
             </div>
             <div className="w-full bg-white/10 h-3.5 rounded-full p-0.5 border border-white/10 overflow-hidden relative">
               <div 
@@ -473,28 +624,203 @@ export default function App() {
           </div>
         </div>
 
-        {/* Motivational Board */}
-        <div className="bg-white border-b-4 border-r-4 border-vp-lightpink/60 border-2 p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h3 className="text-xs font-mono font-black text-vp-pink uppercase tracking-widest flex items-center gap-1.5">
-            <span>📚 AKORTLU BAŞARI VE MOTİVASYON MERKEZİ</span>
-          </h3>
-          <p className="text-xs text-slate-600 font-sans leading-relaxed font-medium">
-            Önümüzdeki süreci en akortlu, pürüzsüz ve disiplinli şekilde yöneteceğiz İloş! Bu sayfa senin motivasyon merkezindir. Aşağıdan günün sözlerini değiştirebilir ve her saniye KPSS hedefine kilitlenebilirsin.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100/50">
-              <div className="text-[10px] font-mono font-black text-vp-pink uppercase tracking-wider mb-1">🎯 Günlük Hedef Stratejisi</div>
-              <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                Samsun kütüphane masasında her gün düzenli soru çözümü ve paragrafları darmadağın etme disiplini!
+        {/* KOZMİK AKORT VE ENERJİ İSTASYONU */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* 1. Atakum Poyrazı ile Dert Üfleme Balonu */}
+          <div className="bg-white border-b-4 border-r-4 border-vp-lightpink/60 border-2 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="text-xs font-mono font-black text-vp-pink uppercase tracking-widest flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
+                <span>🎈 DERT ÜFLEME BALONU</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium leading-relaxed">
+                Kafanı kurcalayan, modunu düşüren veya sınavla ilgili ne varsa buraya yazıp Atakum poyrazına fırlat!
               </p>
+
+              {!blownBubble ? (
+                <form onSubmit={handleBlowStress} className="mt-4 space-y-2">
+                  <input 
+                    type="text"
+                    value={stressInput}
+                    onChange={(e) => setStressInput(e.target.value)}
+                    placeholder="Seni sıkan şeyi yaz İloşum... (örn: coğrafya ezberleri)"
+                    className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-250 focus:border-sky-400 focus:bg-white transition-all text-slate-700"
+                  />
+                  <button 
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-sky-400 to-indigo-500 hover:from-sky-500 hover:to-indigo-600 text-white py-2.5 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-sky-400/20 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    <span>Poyraza Doğru Üfle! 🪁💨</span>
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-6 flex flex-col items-center justify-center text-center space-y-4">
+                  {/* Floating interactive balloon */}
+                  <div 
+                    onClick={handlePopBubble}
+                    className={`relative w-28 h-28 bg-gradient-to-tr from-sky-400 via-purple-400 to-pink-400 rounded-full flex items-center justify-center p-3 text-center cursor-pointer shadow-lg hover:scale-110 active:scale-90 transition-transform ${
+                      isPopping ? "animate-ping opacity-0" : "animate-bounce"
+                    }`}
+                    style={{ animationDuration: "3s" }}
+                  >
+                    {/* Balloon knot */}
+                    <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-purple-400 rotate-45" />
+                    <span className="text-[10px] font-black text-white leading-tight font-sans break-words drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
+                      {blownBubble.text}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-mono font-black text-purple-500 uppercase tracking-wider animate-pulse">
+                    🎈 BALONA DOKUN VE PATLAT! 🎈
+                  </p>
+                </div>
+              )}
+
+              {/* Success / Pop Message */}
+              {bubbleMessage && (
+                <div className="mt-4 bg-sky-50 border border-sky-100 p-3.5 rounded-2xl text-center shadow-inner animate-[fadeIn_0.5s_ease-out]">
+                  <p className="text-xs text-sky-850 font-bold leading-relaxed">
+                    {bubbleMessage}
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100/50">
-              <div className="text-[10px] font-mono font-black text-rose-600 uppercase tracking-wider mb-1">🦁 Aslan Burcu Aurası</div>
-              <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                Sarsılmaz irade, özgüven ve Atakum melteminin ferahlığıyla tüm hedeflerine teker teker ulaşacaksın!
-              </p>
+            
+            <div className="pt-2 text-[9px] font-mono text-slate-400 font-bold text-center border-t border-slate-50">
+              Uçurulan her balon zihni pürüzsüzleştirir 🪁
             </div>
           </div>
+
+          {/* 2. Kozmik Akort Enerji Kristali */}
+          <div className="bg-white border-b-4 border-r-4 border-vp-lightpink/60 border-2 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="text-xs font-mono font-black text-vp-pink uppercase tracking-widest flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-purple-500 animate-pulse" />
+                <span>🔮 KOZMİK AKORT KRİSTALİ</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium leading-relaxed">
+                Kristale dokunarak aurandaki, odağındaki ve sevgideki taze enerji düzeylerini zirveye ulaştır!
+              </p>
+
+              {/* Glowing Interactive Crystal */}
+              <div className="my-4 flex justify-center">
+                <div 
+                  onClick={handleTuneCrystal}
+                  className="w-16 h-24 bg-gradient-to-b from-purple-500 via-pink-500 to-rose-400 cursor-pointer shadow-[0_0_25px_rgba(168,85,247,0.55)] hover:shadow-[0_0_40px_rgba(244,63,94,0.75)] active:scale-95 transition-all animate-pulse"
+                  style={{
+                    clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                    animationDuration: "2s"
+                  }}
+                  title="Akort Etmek İçin Dokun! 🔮"
+                />
+              </div>
+
+              {/* Crystal Live Stats */}
+              <div className="grid grid-cols-2 gap-2 text-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="p-1.5">
+                  <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">Aslan Aurası</span>
+                  <span className="text-xs font-black font-mono text-vp-pink">%{crystalStats.aura}</span>
+                </div>
+                <div className="p-1.5">
+                  <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">Odaklanma</span>
+                  <span className="text-xs font-black font-mono text-indigo-600">%{crystalStats.focus}</span>
+                </div>
+                <div className="p-1.5">
+                  <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">Çilek Enerjisi</span>
+                  <span className="text-xs font-black font-mono text-rose-500">%{crystalStats.cherryEnergy}</span>
+                </div>
+                <div className="p-1.5">
+                  <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">Musti Duaları</span>
+                  <span className="text-xs font-black font-mono text-emerald-600">{crystalStats.mustiPrayers} Adet</span>
+                </div>
+              </div>
+
+              {/* Crystal logs */}
+              <div className="mt-3 bg-purple-50/50 border border-purple-100 p-2.5 rounded-xl text-center min-h-[40px] flex items-center justify-center">
+                <p className="text-[10.5px] text-purple-900 font-bold leading-relaxed">
+                  {crystalMessage}
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleTuneCrystal}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-2.5 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-purple-400/20 transition-all active:scale-95"
+            >
+              Frekansları Eşzamanla ⚡🔮
+            </button>
+          </div>
+
+          {/* 3. Musti'den Telepatik Sevgi Frekansı */}
+          <div className="bg-white border-b-4 border-r-4 border-vp-lightpink/60 border-2 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="text-xs font-mono font-black text-vp-pink uppercase tracking-widest flex items-center gap-1.5">
+                <Heart className="w-4 h-4 text-rose-500 animate-pulse fill-rose-500" />
+                <span>🧬 TELEPATİK SEVGİ FREKANSI</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium leading-relaxed">
+                Şu anki modunu seç ve Mustafa Can'ın kalbinden anında telepatik bir enerji dalgası çöz canım İloş!
+              </p>
+
+              {/* Vibe Selection Grid */}
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button 
+                  onClick={() => handleVibeSelect("sleepy")}
+                  className={`p-2.5 rounded-xl border text-xs font-black text-center cursor-pointer transition-all active:scale-95 ${
+                    selectedVibe === "sleepy" 
+                      ? "bg-purple-650 border-purple-700 text-white shadow-md shadow-purple-500/25" 
+                      : "bg-purple-50/60 border-purple-100 text-purple-900 hover:bg-purple-100"
+                  }`}
+                >
+                  💤 Uykum Geldi
+                </button>
+                <button 
+                  onClick={() => handleVibeSelect("bored")}
+                  className={`p-2.5 rounded-xl border text-xs font-black text-center cursor-pointer transition-all active:scale-95 ${
+                    selectedVibe === "bored" 
+                      ? "bg-pink-650 border-pink-750 text-white shadow-md shadow-pink-500/25" 
+                      : "bg-pink-50/60 border-pink-100 text-pink-900 hover:bg-pink-100"
+                  }`}
+                >
+                  🥱 Çok Sıkıldım
+                </button>
+                <button 
+                  onClick={() => handleVibeSelect("low_energy")}
+                  className={`p-2.5 rounded-xl border text-xs font-black text-center cursor-pointer transition-all active:scale-95 ${
+                    selectedVibe === "low_energy" 
+                      ? "bg-rose-650 border-rose-750 text-white shadow-md shadow-rose-500/25" 
+                      : "bg-rose-50/60 border-rose-100 text-rose-950 hover:bg-rose-100"
+                  }`}
+                >
+                  📉 Modum Düştü
+                </button>
+                <button 
+                  onClick={() => handleVibeSelect("erik")}
+                  className={`p-2.5 rounded-xl border text-xs font-black text-center cursor-pointer transition-all active:scale-95 ${
+                    selectedVibe === "erik" 
+                      ? "bg-emerald-650 border-emerald-750 text-white shadow-md shadow-emerald-500/25" 
+                      : "bg-emerald-50/60 border-emerald-100 text-emerald-950 hover:bg-emerald-100"
+                  }`}
+                >
+                  🍏 Erik Aşeriyorum
+                </button>
+              </div>
+
+              {/* Dynamic telepathic content display */}
+              {telepathicReply && (
+                <div className="mt-4 bg-gradient-to-tr from-slate-900 to-purple-950 border-2 border-purple-500/35 p-3.5 rounded-2xl text-center shadow-lg animate-[fadeIn_0.5s_ease-out]">
+                  <p className="text-[11px] text-purple-100 font-bold leading-relaxed italic">
+                    {telepathicReply}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 text-[9px] font-mono text-slate-400 font-bold text-center border-t border-slate-50">
+              Musti'nin sevgisi her frekansta seninle 🛰️💜
+            </div>
+          </div>
+
         </div>
 
       </main>
